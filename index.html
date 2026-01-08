@@ -6,66 +6,68 @@
         @import url('https://fonts.googleapis.com/css2?family=Hind:wght@700&family=Oswald:wght@700&display=swap');
         body { margin: 0; padding: 0; overflow: hidden; background: transparent; font-family: 'Hind', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
         
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #ffcc00; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 30px; z-index: 999; cursor: pointer; text-align: center; font-weight: bold; border: 10px dashed #ffcc00; }
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); color: #ffcc00; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 30px; z-index: 999; cursor: pointer; text-align: center; font-weight: bold; border: 10px dashed #ffcc00; }
         #breaking-box { width: 1000px; height: 550px; background: #000; border: 8px solid #ffcc00; position: relative; display: none; flex-direction: column; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,1); border-radius: 25px; }
         #header { background: #cc0000; color: white; font-family: 'Oswald', sans-serif; font-size: 65px; padding: 20px; text-align: center; border-bottom: 8px solid #ffcc00; text-transform: uppercase; letter-spacing: 5px; animation: glow 1s infinite alternate; }
         #content { padding: 45px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; text-align: center; background: radial-gradient(circle, #333 0%, #000 100%); }
         #headline { color: #ffcc00; font-size: 68px; font-weight: 900; margin-bottom: 30px; line-height: 1.1; }
         #details { color: white; font-size: 38px; font-weight: 500; line-height: 1.4; }
         @keyframes glow { from { background: #b30000; } to { background: #ff0000; } }
-        .slide-up { animation: slideUp 0.6s ease-out; }
-        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .slide-up { animation: slideUp 0.5s ease-out; }
+        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
 <body onclick="initNews()">
 
     <div id="start-overlay">
-        स्मार्ट अपडेट सिस्टम चालू <br> <span style="font-size: 50px; color:white;">यहाँ क्लिक करें</span> <br> (Stable Real-Time Sync)
+        ULTRA-SYNC MODE ACTIVE <br> <span style="font-size: 50px; color:white;">यहाँ क्लिक करें</span> <br> (Force Update Enabled)
     </div>
 
     <div id="breaking-box">
         <div id="header">BREAKING NEWS</div>
         <div id="content">
-            <div id="headline">कनेक्ट किया जा रहा है...</div>
-            <div id="details">प्रतीक्षा करें</div>
+            <div id="headline">सिस्टम तैयार है...</div>
+            <div id="details">डेटा सिंक किया जा रहा है</div>
         </div>
     </div>
 
     <script>
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSja0mAGnsQR3ByKHh3-qdEx9P-zBuxmsE635ZnCW9Igf2zjmd41kWeaBDqTPBgeQI8bjPI0BBWusYD/pub?output=csv';
+        // आपकी शीट का ओरिजिनल ID
+        const SHEET_ID = '1sja0mAGnsQR3ByKHh3-qdEx9P-zBuxmsE635ZnCW9Igf2zjmd41kWeaBDqTPBgeQI8bjPI0BBWusYD';
+        // CSV के बजाय JSON API का उपयोग (यह तेज़ अपडेट होता है)
+        const JSON_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
 
         let newsItems = [];
         let currentIndex = 0;
         const synth = window.speechSynthesis;
         const beep = new Audio('https://www.soundjay.com/buttons/sounds/beep-07.mp3');
 
-        // डेटा लोड करने का नया और स्टेबल फंक्शन
-        async function fetchSheet() {
+        async function fetchRealTimeData() {
             try {
-                const response = await fetch(`${CSV_URL}&cache=${new Date().getTime()}`);
-                const data = await response.text();
-                const rows = data.split('\n').map(row => row.split(','));
+                // गूगल को मजबूर करना कि वह पुराना डेटा न दे
+                const response = await fetch(`${JSON_URL}&t=${new Date().getTime()}`);
+                const text = await response.text();
+                const json = JSON.parse(text.substr(47).slice(0, -2));
                 
-                const tempItems = rows.map(r => ({
-                    head: r[0] ? r[0].replace(/"/g, '').trim() : "",
-                    detail: r[1] ? r[1].replace(/"/g, '').trim() : ""
-                })).filter(item => item.head.length > 2);
+                const freshItems = json.table.rows.map(row => ({
+                    head: row.c[0] ? String(row.c[0].v).trim() : "",
+                    detail: row.c[1] ? String(row.c[1].v).trim() : ""
+                })).filter(item => item.head.length > 1);
 
-                if (tempItems.length > 0) {
-                    newsItems = tempItems;
+                if (freshItems.length > 0) {
+                    newsItems = freshItems;
                 }
             } catch (e) {
-                console.error("Fetch Error");
+                console.error("Sync Error");
             }
         }
 
-        async function startDisplay() {
-            if (newsItems.length === 0) {
-                await fetchSheet();
-            }
+        async function playNews() {
+            // अगली न्यूज़ चलाने से ठीक पहले ताज़ा डेटा लें
+            await fetchRealTimeData();
 
             if (newsItems.length === 0) {
-                setTimeout(startDisplay, 3000);
+                setTimeout(playNews, 3000);
                 return;
             }
 
@@ -73,7 +75,6 @@
 
             const item = newsItems[currentIndex];
             
-            // UI अपडेट
             document.getElementById('headline').innerText = item.head;
             document.getElementById('details').innerText = item.detail;
             document.getElementById('content').classList.remove('slide-up');
@@ -82,17 +83,14 @@
 
             beep.play().catch(e => {});
 
-            // AI बोलना
             const utter = new SpeechSynthesisUtterance(`${item.head}। ${item.detail}`);
             utter.lang = 'hi-IN';
-            utter.rate = 0.85;
+            utter.rate = 0.9;
 
             utter.onend = () => {
                 currentIndex++;
-                // न्यूज़ खत्म होते ही तुरंत बैकग्राउंड में डेटा ताज़ा करें
-                fetchSheet().then(() => {
-                    setTimeout(startDisplay, 2000);
-                });
+                // 2 सेकंड का इंतज़ार ताकि अगला डेटा फेच हो सके
+                setTimeout(playNews, 2000);
             };
 
             synth.speak(utter);
@@ -101,13 +99,13 @@
         function initNews() {
             document.getElementById('start-overlay').style.display = 'none';
             document.getElementById('breaking-box').style.display = 'flex';
-            fetchSheet().then(() => startDisplay());
+            playNews();
         }
 
-        // हर 15 सेकंड में बैकग्राउंड अपडेट (अगर एंकर चुप है)
+        // एक्स्ट्रा सुरक्षा: हर 10 सेकंड में बैकग्राउंड फेच
         setInterval(() => {
-            if (!synth.speaking) fetchSheet();
-        }, 15000);
+            if(!synth.speaking) fetchRealTimeData();
+        }, 10000);
     </script>
 </body>
 </html>
