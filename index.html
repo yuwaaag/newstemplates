@@ -6,7 +6,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Hind:wght@700&family=Oswald:wght@700&display=swap');
         body { margin: 0; padding: 0; overflow: hidden; background: transparent; font-family: 'Hind', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
         
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #ffcc00; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 30px; z-index: 999; cursor: pointer; text-align: center; font-weight: bold; border: 10px dashed #ffcc00; }
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #ffcc00; display: flex; justify-content: center; align-items: center; font-size: 30px; z-index: 999; cursor: pointer; text-align: center; font-weight: bold; border: 10px dashed #ffcc00; }
         #breaking-box { width: 1000px; height: 550px; background: #000; border: 8px solid #ffcc00; position: relative; display: none; flex-direction: column; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,1); border-radius: 25px; }
         #header { background: #cc0000; color: white; font-family: 'Oswald', sans-serif; font-size: 65px; padding: 20px; text-align: center; border-bottom: 8px solid #ffcc00; text-transform: uppercase; letter-spacing: 5px; animation: glow 1s infinite alternate; }
         #content { padding: 45px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; text-align: center; background: radial-gradient(circle, #333 0%, #000 100%); }
@@ -20,13 +20,13 @@
 <body onclick="initNews()">
 
     <div id="start-overlay">
-        सिस्टम को रीसेट कर दिया गया है <br> <span style="font-size: 50px; color:white;">यहाँ क्लिक करें</span> <br> (Smooth Audio Fixed)
+        रियल-टाइम अपडेट चालू है <br> <span style="font-size: 50px; color:white;">यहाँ क्लिक करें</span> <br> (Instant Sync Enabled)
     </div>
 
     <div id="breaking-box">
         <div id="header">BREAKING NEWS</div>
         <div id="content">
-            <div id="headline">न्यूज़ लोड हो रही है...</div>
+            <div id="headline">कनेक्ट किया जा रहा है...</div>
             <div id="details">प्रतीक्षा करें</div>
         </div>
     </div>
@@ -36,87 +36,81 @@
 
         let newsItems = [];
         let currentIndex = 0;
-        let isFetching = false;
         const synth = window.speechSynthesis;
         const beep = new Audio('https://www.soundjay.com/buttons/sounds/beep-07.mp3');
 
-        async function fetchSheet() {
-            if (isFetching || synth.speaking) return; // अगर एंकर बोल रहा है तो डिस्टर्ब न करें
-            isFetching = true;
+        // गूगल शीट से एकदम ताज़ा डेटा खींचने का फंक्शन
+        async function fetchSheetData() {
             try {
                 const response = await fetch(`${CSV_URL}&cb=${new Date().getTime()}`);
                 const data = await response.text();
                 const rows = data.split('\n').map(row => row.split(','));
                 
-                newsItems = rows.map(r => ({
+                // केवल वही खबरें लें जो खाली नहीं हैं
+                return rows.map(r => ({
                     head: r[0] ? r[0].replace(/"/g, '').trim() : "",
                     detail: r[1] ? r[1].replace(/"/g, '').trim() : ""
                 })).filter(item => item.head.length > 2);
-
-                if (newsItems.length > 0 && !synth.speaking) {
-                    showNews();
-                }
-            } catch (e) { console.error("Data Load Error"); }
-            isFetching = false;
+            } catch (e) {
+                console.error("Sync Error");
+                return [];
+            }
         }
 
-        function showNews() {
-            if (newsItems.length === 0 || synth.speaking) return;
+        async function playNewsLoop() {
+            // हर न्यूज़ शुरू होने से पहले लिस्ट को ताज़ा करें (Real-Time Sync)
+            newsItems = await fetchSheetData();
+
+            if (newsItems.length === 0) {
+                document.getElementById('headline').innerText = "कोई न्यूज़ नहीं है";
+                document.getElementById('details').innerText = "शीट में न्यूज़ जोड़ें";
+                setTimeout(playNewsLoop, 5000);
+                return;
+            }
+
+            // अगर करंट इंडेक्स डिलीट हुई न्यूज़ के बाहर है, तो शुरू से शुरू करें
             if (currentIndex >= newsItems.length) currentIndex = 0;
 
             const item = newsItems[currentIndex];
-            const headlineEl = document.getElementById('headline');
             
-            headlineEl.classList.remove('slide-up');
-            void headlineEl.offsetWidth; 
-            headlineEl.classList.add('slide-up');
-
-            headlineEl.innerText = item.head;
+            // UI अपडेट
+            document.getElementById('headline').innerText = item.head;
             document.getElementById('details').innerText = item.detail;
-            
-            beep.play().catch(e => {});
-            
-            // आवाज़ का इंतज़ार करें फिर शुरू करें
-            setTimeout(() => {
-                speakNow(`${item.head}। ${item.detail}`);
-            }, 500);
-        }
+            document.getElementById('content').classList.remove('slide-up');
+            void document.getElementById('content').offsetWidth;
+            document.getElementById('content').classList.add('slide-up');
 
-        function speakNow(text) {
-            synth.cancel(); 
-            const utter = new SpeechSynthesisUtterance(text);
+            beep.play().catch(e => {});
+
+            // AI बोलना शुरू करे
+            const utter = new SpeechSynthesisUtterance(`${item.head}। ${item.detail}`);
             utter.lang = 'hi-IN';
             utter.rate = 0.85;
-            utter.pitch = 1;
 
             let voices = synth.getVoices();
-            let hindiVoice = voices.find(v => v.lang.includes('hi'));
-            if (hindiVoice) utter.voice = hindiVoice;
-
-            utter.onstart = () => { console.log("Anchor started speaking..."); };
+            utter.voice = voices.find(v => v.lang.includes('hi')) || voices[0];
 
             utter.onend = () => {
                 currentIndex++;
-                // न्यूज़ पूरी होने के बाद ही अगला स्टेप लें
-                setTimeout(() => {
-                    fetchSheet(); // नई न्यूज़ चेक करें
-                    showNews();   // अगली न्यूज़ दिखाएं
-                }, 2000); 
+                // न्यूज़ खत्म होते ही तुरंत अगला लूप चलाएं (जो ताज़ा डेटा चेक करेगा)
+                setTimeout(playNewsLoop, 2000); 
             };
-            
+
             synth.speak(utter);
         }
 
         function initNews() {
             document.getElementById('start-overlay').style.display = 'none';
             document.getElementById('breaking-box').style.display = 'flex';
-            fetchSheet();
+            playNewsLoop();
         }
 
-        // हर 20 सेकंड में सिर्फ तभी चेक करें जब शांत हो
-        setInterval(() => {
-            if (!synth.speaking) fetchSheet();
-        }, 20000);
+        // बैकग्राउंड में हर 10 सेकंड में डेटा ताज़ा करते रहें (Safe Guard)
+        setInterval(async () => {
+            if (!synth.speaking) {
+                newsItems = await fetchSheetData();
+            }
+        }, 10000);
     </script>
 </body>
 </html>
