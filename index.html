@@ -6,12 +6,19 @@
         @import url('https://fonts.googleapis.com/css2?family=Hind:wght@700&family=Oswald:wght@700&display=swap');
         body { margin: 0; padding: 0; overflow: hidden; background: transparent; font-family: 'Hind', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
         
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #ffcc00; display: flex; justify-content: center; align-items: center; font-size: 30px; z-index: 999; cursor: pointer; text-align: center; font-weight: bold; border: 10px dashed #ffcc00; }
-        #breaking-box { width: 1000px; height: 550px; background: #000; border: 8px solid #ffcc00; position: relative; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,1); border-radius: 25px; display: none; }
+        /* Interactive Overlay */
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #ffcc00; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 30px; z-index: 999; cursor: pointer; text-align: center; font-weight: bold; border: 10px dashed #ffcc00; }
+
+        #breaking-box { width: 1000px; height: 550px; background: #000; border: 8px solid #ffcc00; position: relative; display: none; flex-direction: column; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,1); border-radius: 25px; }
+
         #header { background: #cc0000; color: white; font-family: 'Oswald', sans-serif; font-size: 65px; padding: 20px; text-align: center; border-bottom: 8px solid #ffcc00; text-transform: uppercase; letter-spacing: 5px; animation: glow 1s infinite alternate; }
+
         #content { padding: 45px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; text-align: center; background: radial-gradient(circle, #333 0%, #000 100%); }
+
         #headline { color: #ffcc00; font-size: 68px; font-weight: 900; margin-bottom: 30px; line-height: 1.1; }
+
         #details { color: white; font-size: 38px; font-weight: 500; line-height: 1.4; }
+
         @keyframes glow { from { background: #b30000; } to { background: #ff0000; } }
         .slide-up { animation: slideUp 0.6s ease-out; }
         @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -20,19 +27,21 @@
 <body onclick="initNews()">
 
     <div id="start-overlay">
-        सिस्टम अपडेट हो गया है <br> <span style="font-size: 50px;">यहाँ क्लिक करें</span> <br> (No Refresh Required Now)
+        सिस्टम शुरू करने के लिए <br> <span style="font-size: 60px; color:white;">यहाँ क्लिक करें</span> <br> (Click Anywhere to Start)
     </div>
 
     <div id="breaking-box">
         <div id="header">BREAKING NEWS</div>
         <div id="content">
-            <div id="headline">ताज़ा खबरें लोड हो रही हैं...</div>
+            <div id="headline">खबरें लोड हो रही हैं...</div>
             <div id="details">प्रतीक्षा करें</div>
         </div>
     </div>
 
     <script>
-        const SHEET_ID = '1sja0mAGnsQR3ByKHh3-qdEx9P-zBuxmsE635ZnCW9Igf2zjmd41kWeaBDqTPBgeQI8bjPI0BBWusYD';
+        // आपकी पब्लिश की हुई शीट का CSV लिंक
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSja0mAGnsQR3ByKHh3-qdEx9P-zBuxmsE635ZnCW9Igf2zjmd41kWeaBDqTPBgeQI8bjPI0BBWusYD/pub?output=csv';
+
         let newsItems = [];
         let currentIndex = 0;
         const synth = window.speechSynthesis;
@@ -40,26 +49,23 @@
 
         async function fetchSheet() {
             try {
-                // Anti-Cache: हर बार एक नया टाइमस्टैम्प जोड़ना ताकि डेटा ताज़ा मिले
-                const timestamp = new Date().getTime();
-                const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&t=${timestamp}`;
-
-                const response = await fetch(SHEET_URL);
-                const text = await response.text();
-                const jsonData = JSON.parse(text.substr(47).slice(0, -2));
+                const response = await fetch(`${CSV_URL}&cachebuster=${new Date().getTime()}`);
+                const data = await response.text();
                 
-                const newItems = jsonData.table.rows.map(row => ({
-                    head: row.c[0] ? row.c[0].v : "",
-                    detail: row.c[1] ? row.c[1].v : ""
+                // सरल तरीके से CSV को न्यूज़ में बदलना
+                const rows = data.split('\n').map(row => row.split(','));
+                newsItems = rows.map(r => ({
+                    head: r[0] ? r[0].replace(/"/g, '') : "",
+                    detail: r[1] ? r[1].replace(/"/g, '') : ""
                 })).filter(item => item.head.length > 2);
 
-                // पुरानी लिस्ट को नई लिस्ट से अपडेट करें
-                newsItems = newItems;
-                
                 if (newsItems.length > 0 && !synth.speaking) {
                     showNews();
                 }
-            } catch (e) { console.log("Fetch Error:", e); }
+            } catch (e) {
+                document.getElementById('headline').innerText = "Sheet Error!";
+                console.error(e);
+            }
         }
 
         function showNews() {
@@ -87,12 +93,12 @@
             utter.rate = 0.85;
 
             let voices = synth.getVoices();
-            utter.voice = voices.find(v => v.lang.includes('hi')) || voices[0];
+            let hindiVoice = voices.find(v => v.lang.includes('hi'));
+            if (hindiVoice) utter.voice = hindiVoice;
 
             utter.onend = () => {
                 currentIndex++;
-                // अगली न्यूज़ लोड करने से पहले फिर से डेटा चेक करें
-                fetchSheet(); 
+                setTimeout(fetchSheet, 1000); // अगली खबर से पहले डेटा फिर चेक करें
                 setTimeout(showNews, 3500); 
             };
             synth.speak(utter);
@@ -104,8 +110,8 @@
             fetchSheet();
         }
 
-        // बैकग्राउंड में हर 30 सेकंड में नई न्यूज़ चेक करता रहेगा
-        setInterval(fetchSheet, 30000); 
+        // हर 30 सेकंड में ऑटो-अपडेट
+        setInterval(fetchSheet, 30000);
     </script>
 </body>
 </html>
