@@ -4,146 +4,117 @@
     <meta charset="UTF-8">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Hind:wght@700&family=Oswald:wght@700&display=swap');
-
         body { margin: 0; padding: 0; overflow: hidden; background: transparent; font-family: 'Hind', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
         
-        #breaking-box {
-            width: 900px;
-            height: 500px;
-            background: linear-gradient(135deg, #1a1a1a 0%, #000 100%);
-            border: 6px solid #ffcc00;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 0 50px rgba(0,0,0,1);
-            border-radius: 15px;
-        }
+        /* Start Button for OBS */
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); color: #ffcc00; display: flex; justify-content: center; align-items: center; font-size: 32px; z-index: 999; cursor: pointer; text-align: center; font-weight: bold; border: 8px dashed #ffcc00; }
 
-        #header {
-            background: #cc0000;
-            color: white;
-            font-family: 'Oswald', sans-serif;
-            font-size: 55px;
-            padding: 15px;
-            text-align: center;
-            border-bottom: 6px solid #ffcc00;
-            text-transform: uppercase;
-            letter-spacing: 4px;
-            animation: glow 1.5s infinite alternate;
-        }
+        #breaking-box { width: 1000px; height: 550px; background: #000; border: 8px solid #ffcc00; position: relative; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,1); border-radius: 25px; display: none; }
 
-        #content {
-            padding: 40px;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            text-align: center;
-            background: url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
-        }
+        #header { background: #cc0000; color: white; font-family: 'Oswald', sans-serif; font-size: 65px; padding: 20px; text-align: center; border-bottom: 8px solid #ffcc00; text-transform: uppercase; letter-spacing: 5px; animation: glow 1s infinite alternate; }
 
-        #headline {
-            color: #ffcc00;
-            font-size: 60px;
-            font-weight: 900;
-            margin-bottom: 25px;
-            line-height: 1.1;
-            text-shadow: 3px 3px 10px rgba(0,0,0,0.5);
-        }
+        #content { padding: 45px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; text-align: center; background: radial-gradient(circle, #333 0%, #000 100%); }
 
-        #details {
-            color: white;
-            font-size: 34px;
-            font-weight: 500;
-            line-height: 1.4;
-        }
+        #headline { color: #ffcc00; font-size: 68px; font-weight: 900; margin-bottom: 30px; line-height: 1.1; text-shadow: 4px 4px 10px rgba(0,0,0,0.8); }
 
-        @keyframes glow { from { background: #cc0000; box-shadow: inset 0 0 20px #ff0000; } to { background: #ff0000; box-shadow: inset 0 0 40px #cc0000; } }
-        
-        /* Transition effect */
-        .slide-up { animation: slideUp 0.6s ease-out; }
-        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        #details { color: white; font-size: 38px; font-weight: 500; line-height: 1.4; }
+
+        @keyframes glow { from { background: #b30000; } to { background: #ff0000; } }
+        .slide-up { animation: slideUp 0.7s ease-out; }
+        @keyframes slideUp { from { transform: translateY(80px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
-<body onclick="startLiveNews()">
+<body>
+
+    <div id="start-overlay" onclick="initNews()">
+        सिस्टम शुरू करने के लिए यहाँ क्लिक करें <br> (Interact and Click to Start Audio)
+    </div>
 
     <div id="breaking-box">
         <div id="header">BREAKING NEWS</div>
-        <div id="content" id="news-anim">
-            <div id="headline">लोडिंग...</div>
-            <div id="details">शीट से खबरें आ रही हैं...</div>
+        <div id="content">
+            <div id="headline">खबरें लोड हो रही हैं...</div>
+            <div id="details">कृपया प्रतीक्षा करें</div>
         </div>
     </div>
 
     <script>
-        // --- अपनी Google Sheet ID यहाँ डालें ---
-        const SHEET_ID = '2PACX-1vSja0mAGnsQR3ByKHh3-qdEx9P-zBuxmsE635ZnCW9Igf2zjmd41kWeaBDqTPBgeQI8bjPI0BBWusYD'; 
-        const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+        // आपकी शीट ID यहाँ सेट कर दी गई है
+        const SHEET_ID = '1sja0mAGnsQR3ByKHh3-qdEx9P-zBuxmsE635ZnCW9Igf2zjmd41kWeaBDqTPBgeQI8bjPI0BBWusYD'; 
+        const CSV_URL = `https://docs.google.com/spreadsheets/d/e/2PACX-1vSja0mAGnsQR3ByKHh3-qdEx9P-zBuxmsE635ZnCW9Igf2zjmd41kWeaBDqTPBgeQI8bjPI0BBWusYD/pub?output=csv`;
 
         let newsItems = [];
         let currentIndex = 0;
         const synth = window.speechSynthesis;
-        
-        // Beep Sound का जुगाड़ (No external file needed)
         const beep = new Audio('https://www.soundjay.com/buttons/sounds/beep-07.mp3');
 
         async function fetchSheet() {
             try {
                 const response = await fetch(CSV_URL);
                 const data = await response.text();
-                const rows = data.split('\n').map(row => row.split(','));
-                newsItems = rows.filter(r => r[0] && r[0].trim() !== "");
-                if (!synth.speaking) playNextNews();
-            } catch (e) { console.error("Sheet Error"); }
+                
+                // CSV Parsing
+                const rows = data.split('\n').map(row => {
+                    // सफाई: कोट्स और फालतू स्पेस हटाना
+                    return row.split(',').map(cell => cell.replace(/^"(.*)"$/, '$1').trim());
+                });
+
+                newsItems = rows.filter(row => row[0] && row[0].length > 2);
+
+                if (newsItems.length > 0 && !synth.speaking) {
+                    showNews();
+                }
+            } catch (e) { 
+                document.getElementById('headline').innerText = "Data Error!";
+            }
         }
 
-        function playNextNews() {
-            if (newsItems.length === 0) return;
+        function showNews() {
             if (currentIndex >= newsItems.length) currentIndex = 0;
 
-            const head = newsItems[currentIndex][0].replace(/"/g, "");
-            const detail = (newsItems[currentIndex][1] || "").replace(/"/g, "");
+            const head = newsItems[currentIndex][0];
+            const detail = newsItems[currentIndex][1] || "";
 
-            // 1. Beep Sound बजाएं
-            beep.play().catch(e => console.log("Audio Error"));
+            // UI Update with Animation
+            const headlineEl = document.getElementById('headline');
+            headlineEl.classList.remove('slide-up');
+            void headlineEl.offsetWidth; // Trigger reflow
+            headlineEl.classList.add('slide-up');
 
-            // 2. स्क्रीन अपडेट करें और एनीमेशन दें
-            const content = document.getElementById('content');
-            content.classList.remove('slide-up');
-            void content.offsetWidth; // रिफ्लो के लिए
-            content.classList.add('slide-up');
-            
-            document.getElementById('headline').innerText = head;
+            headlineEl.innerText = head;
             document.getElementById('details').innerText = detail;
+            
+            beep.play().catch(e => {});
+            speakNow(`${head}। ${detail}`);
+        }
 
-            // 3. साफ़ आवाज़ में बोलें
-            const utter = new SpeechSynthesisUtterance(`${head}। ${detail}`);
+        function speakNow(text) {
+            synth.cancel(); 
+            const utter = new SpeechSynthesisUtterance(text);
             utter.lang = 'hi-IN';
-            utter.rate = 0.85; // नेचुरल स्पीड
-            utter.pitch = 1;
+            utter.rate = 0.85;
 
-            // आवाज़ फिक्स (Van-Van रोकने के लिए)
-            const voices = synth.getVoices();
-            const hindiVoice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('hi'));
+            // सही हिंदी आवाज़ चुनना
+            let voices = synth.getVoices();
+            let hindiVoice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('hi'));
             if (hindiVoice) utter.voice = hindiVoice;
 
             utter.onend = () => {
                 currentIndex++;
-                setTimeout(playNextNews, 2500); // खबर खत्म होने के 2.5 सेकंड बाद अगली खबर
+                setTimeout(showNews, 4000); // अगली न्यूज़ के लिए 4 सेकंड का इंतज़ार
             };
-
             synth.speak(utter);
         }
 
-        function startLiveNews() {
-            if (synth.speaking) synth.cancel();
+        function initNews() {
+            document.getElementById('start-overlay').style.display = 'none';
+            document.getElementById('breaking-box').style.display = 'flex';
             fetchSheet();
         }
 
-        // हर 1 मिनट में शीट चेक करें
+        // हर 1 मिनट में शीट अपडेट चेक करें
         setInterval(fetchSheet, 60000);
-        window.speechSynthesis.onvoiceschanged = () => { fetchSheet(); };
+        window.speechSynthesis.onvoiceschanged = () => {}; 
     </script>
 </body>
 </html>
